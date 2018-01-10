@@ -24,323 +24,322 @@ gettext.js back in 2008. I was able to vet a lot of my ideas
 against his. I also made sure Jed passed against his tests
 in order to offer easy upgrades -- jsgettext.berlios.de
 */
-(function (root, undef) {
 
-  // Jed is a constructor function
-  var Jed = function ( options ) {
-    // Some minimal defaults
-    this.defaults = {
-      "locale_data" : {
-        "messages" : {
-          "" : {
-            "domain"       : "messages",
-            "lang"         : "en",
-            "plural_forms" : "nplurals=2; plural=(n != 1);"
-          }
-          // There are no default keys, though
+// Jed is a constructor function
+var Jed = function ( options ) {
+  // Some minimal defaults
+  this.defaults = {
+    "locale_data" : {
+      "messages" : {
+        "" : {
+          "domain"       : "messages",
+          "lang"         : "en",
+          "plural_forms" : "nplurals=2; plural=(n != 1);"
         }
-      },
-      // The default domain if one is missing
-      "domain" : "messages",
-      // enable debug mode to log untranslated strings to the console
-      "debug" : false
-    };
-
-    // Mix in the sent options with the default options
-    this.options = Object.assign( {}, this.defaults, options );
-    this.textdomain( this.options.domain );
-
-    if ( options.domain && ! this.options.locale_data[ this.options.domain ] ) {
-      throw new Error('Text domain set to non-existent domain: `' + options.domain + '`');
-    }
+        // There are no default keys, though
+      }
+    },
+    // The default domain if one is missing
+    "domain" : "messages",
+    // enable debug mode to log untranslated strings to the console
+    "debug" : false
   };
 
-  // The gettext spec sets this character as the default
-  // delimiter for context lookups.
-  // e.g.: context\u0004key
-  // If your translation company uses something different,
-  // just change this at any time and it will use that instead.
-  Jed.context_delimiter = String.fromCharCode( 4 );
+  // Mix in the sent options with the default options
+  this.options = Object.assign( {}, this.defaults, options );
+  this.textdomain( this.options.domain );
 
-  function getPluralFormFunc ( plural_form_string ) {
-    return Jed.PF.compile( plural_form_string || "nplurals=2; plural=(n != 1);");
+  if ( options.domain && ! this.options.locale_data[ this.options.domain ] ) {
+    throw new Error('Text domain set to non-existent domain: `' + options.domain + '`');
+  }
+};
+
+// The gettext spec sets this character as the default
+// delimiter for context lookups.
+// e.g.: context\u0004key
+// If your translation company uses something different,
+// just change this at any time and it will use that instead.
+Jed.context_delimiter = String.fromCharCode( 4 );
+
+function getPluralFormFunc ( plural_form_string ) {
+  return Jed.PF.compile( plural_form_string || "nplurals=2; plural=(n != 1);");
+}
+
+// Add functions to the Jed prototype.
+// These will be the functions on the object that's returned
+// from creating a `new Jed()`
+// These seem redundant, but they gzip pretty well.
+Object.assign( Jed.prototype, {
+  textdomain : function ( domain ) {
+    if ( ! domain ) {
+      return this._textdomain;
+    }
+    this._textdomain = domain;
+  },
+
+  gettext : function ( key ) {
+    return this.dcnpgettext.call( this, undefined, undefined, key );
+  },
+
+  dgettext : function ( domain, key ) {
+   return this.dcnpgettext.call( this, domain, undefined, key );
+  },
+
+  dcgettext : function ( domain , key /*, category */ ) {
+    // Ignores the category anyways
+    return this.dcnpgettext.call( this, domain, undefined, key );
+  },
+
+  ngettext : function ( skey, pkey, val ) {
+    return this.dcnpgettext.call( this, undefined, undefined, skey, pkey, val );
+  },
+
+  dngettext : function ( domain, skey, pkey, val ) {
+    return this.dcnpgettext.call( this, domain, undefined, skey, pkey, val );
+  },
+
+  dcngettext : function ( domain, skey, pkey, val/*, category */) {
+    return this.dcnpgettext.call( this, domain, undefined, skey, pkey, val );
+  },
+
+  pgettext : function ( context, key ) {
+    return this.dcnpgettext.call( this, undefined, context, key );
+  },
+
+  dpgettext : function ( domain, context, key ) {
+    return this.dcnpgettext.call( this, domain, context, key );
+  },
+
+  dcpgettext : function ( domain, context, key/*, category */) {
+    return this.dcnpgettext.call( this, domain, context, key );
+  },
+
+  npgettext : function ( context, skey, pkey, val ) {
+    return this.dcnpgettext.call( this, undefined, context, skey, pkey, val );
+  },
+
+  dnpgettext : function ( domain, context, skey, pkey, val ) {
+    return this.dcnpgettext.call( this, domain, context, skey, pkey, val );
+  },
+
+  // The most fully qualified gettext function. It has every option.
+  // Since it has every option, we can use it from every other method.
+  // This is the bread and butter.
+  // Technically there should be one more argument in this function for 'Category',
+  // but since we never use it, we might as well not waste the bytes to define it.
+  dcnpgettext : function ( domain, context, singular_key, plural_key, val ) {
+    // Set some defaults
+
+    plural_key = plural_key || singular_key;
+
+    // Use the global domain default if one
+    // isn't explicitly passed in
+    domain = domain || this._textdomain;
+
+    var fallback;
+
+    // Handle special cases
+
+    // No options found
+    if ( ! this.options ) {
+      // There's likely something wrong, but we'll return the correct key for english
+      // We do this by instantiating a brand new Jed instance with the default set
+      // for everything that could be broken.
+      fallback = new Jed();
+      return fallback.dcnpgettext.call( fallback, undefined, undefined, singular_key, plural_key, val );
+    }
+
+    // No translation data provided
+    if ( ! this.options.locale_data ) {
+      throw new Error('No locale data provided.');
+    }
+
+    if ( ! this.options.locale_data[ domain ] ) {
+      throw new Error('Domain `' + domain + '` was not found.');
+    }
+
+    if ( ! this.options.locale_data[ domain ][ "" ] ) {
+      throw new Error('No locale meta information provided.');
+    }
+
+    // Make sure we have a truthy key. Otherwise we might start looking
+    // into the empty string key, which is the options for the locale
+    // data.
+    if ( ! singular_key ) {
+      throw new Error('No translation key found.');
+    }
+
+    var key  = context ? context + Jed.context_delimiter + singular_key : singular_key,
+        locale_data = this.options.locale_data,
+        dict = locale_data[ domain ],
+        defaultConf = (locale_data.messages || this.defaults.locale_data.messages)[""],
+        pluralForms = dict[""].plural_forms || dict[""]["Plural-Forms"] || dict[""]["plural-forms"] || defaultConf.plural_forms || defaultConf["Plural-Forms"] || defaultConf["plural-forms"],
+        val_list,
+        res;
+
+    var val_idx;
+    if (val === undefined) {
+      // No value passed in; assume singular key lookup.
+      val_idx = 0;
+
+    } else {
+      // Value has been passed in; use plural-forms calculations.
+
+      // Handle invalid numbers, but try casting strings for good measure
+      if ( typeof val != 'number' ) {
+        val = parseInt( val, 10 );
+
+        if ( isNaN( val ) ) {
+          throw new Error('The number that was passed in is not a number.');
+        }
+      }
+
+      val_idx = getPluralFormFunc(pluralForms)(val);
+    }
+
+    // Throw an error if a domain isn't found
+    if ( ! dict ) {
+      throw new Error('No domain named `' + domain + '` could be found.');
+    }
+
+    val_list = dict[ key ];
+
+    // If there is no match, then revert back to
+    // english style singular/plural with the keys passed in.
+    if ( ! val_list || val_idx > val_list.length ) {
+      if (this.options.missing_key_callback) {
+        this.options.missing_key_callback(key, domain);
+      }
+      res = [ singular_key, plural_key ];
+
+      // collect untranslated strings
+      if (this.options.debug===true) {
+        console.log(res[ getPluralFormFunc(pluralForms)( val ) ]);
+      }
+      return res[ getPluralFormFunc()( val ) ];
+    }
+
+    res = val_list[ val_idx ];
+
+    // This includes empty strings on purpose
+    if ( ! res  ) {
+      res = [ singular_key, plural_key ];
+      return res[ getPluralFormFunc()( val ) ];
+    }
+    return res;
+  }
+});
+
+
+// Start the Plural forms section
+// This is a full plural form expression parser. It is used to avoid
+// running 'eval' or 'new Function' directly against the plural
+// forms.
+//
+// This can be important if you get translations done through a 3rd
+// party vendor. I encourage you to use this instead, however, I
+// also will provide a 'precompiler' that you can use at build time
+// to output valid/safe function representations of the plural form
+// expressions. This means you can build this code out for the most
+// part.
+Jed.PF = {};
+
+Jed.PF.parse = function ( p ) {
+  var plural_str = Jed.PF.extractPluralExpr( p );
+  return Jed.PF.parser.parse.call(Jed.PF.parser, plural_str);
+};
+
+Jed.PF.compile = function ( p ) {
+  // Handle trues and falses as 0 and 1
+  function imply( val ) {
+    return (val === true ? 1 : val ? val : 0);
   }
 
-  // Add functions to the Jed prototype.
-  // These will be the functions on the object that's returned
-  // from creating a `new Jed()`
-  // These seem redundant, but they gzip pretty well.
-  Object.assign( Jed.prototype, {
-    textdomain : function ( domain ) {
-      if ( ! domain ) {
-        return this._textdomain;
-      }
-      this._textdomain = domain;
-    },
+  var ast = Jed.PF.parse( p );
+  return function ( n ) {
+    return imply( Jed.PF.interpreter( ast )( n ) );
+  };
+};
 
-    gettext : function ( key ) {
-      return this.dcnpgettext.call( this, undef, undef, key );
-    },
-
-    dgettext : function ( domain, key ) {
-     return this.dcnpgettext.call( this, domain, undef, key );
-    },
-
-    dcgettext : function ( domain , key /*, category */ ) {
-      // Ignores the category anyways
-      return this.dcnpgettext.call( this, domain, undef, key );
-    },
-
-    ngettext : function ( skey, pkey, val ) {
-      return this.dcnpgettext.call( this, undef, undef, skey, pkey, val );
-    },
-
-    dngettext : function ( domain, skey, pkey, val ) {
-      return this.dcnpgettext.call( this, domain, undef, skey, pkey, val );
-    },
-
-    dcngettext : function ( domain, skey, pkey, val/*, category */) {
-      return this.dcnpgettext.call( this, domain, undef, skey, pkey, val );
-    },
-
-    pgettext : function ( context, key ) {
-      return this.dcnpgettext.call( this, undef, context, key );
-    },
-
-    dpgettext : function ( domain, context, key ) {
-      return this.dcnpgettext.call( this, domain, context, key );
-    },
-
-    dcpgettext : function ( domain, context, key/*, category */) {
-      return this.dcnpgettext.call( this, domain, context, key );
-    },
-
-    npgettext : function ( context, skey, pkey, val ) {
-      return this.dcnpgettext.call( this, undef, context, skey, pkey, val );
-    },
-
-    dnpgettext : function ( domain, context, skey, pkey, val ) {
-      return this.dcnpgettext.call( this, domain, context, skey, pkey, val );
-    },
-
-    // The most fully qualified gettext function. It has every option.
-    // Since it has every option, we can use it from every other method.
-    // This is the bread and butter.
-    // Technically there should be one more argument in this function for 'Category',
-    // but since we never use it, we might as well not waste the bytes to define it.
-    dcnpgettext : function ( domain, context, singular_key, plural_key, val ) {
-      // Set some defaults
-
-      plural_key = plural_key || singular_key;
-
-      // Use the global domain default if one
-      // isn't explicitly passed in
-      domain = domain || this._textdomain;
-
-      var fallback;
-
-      // Handle special cases
-
-      // No options found
-      if ( ! this.options ) {
-        // There's likely something wrong, but we'll return the correct key for english
-        // We do this by instantiating a brand new Jed instance with the default set
-        // for everything that could be broken.
-        fallback = new Jed();
-        return fallback.dcnpgettext.call( fallback, undefined, undefined, singular_key, plural_key, val );
-      }
-
-      // No translation data provided
-      if ( ! this.options.locale_data ) {
-        throw new Error('No locale data provided.');
-      }
-
-      if ( ! this.options.locale_data[ domain ] ) {
-        throw new Error('Domain `' + domain + '` was not found.');
-      }
-
-      if ( ! this.options.locale_data[ domain ][ "" ] ) {
-        throw new Error('No locale meta information provided.');
-      }
-
-      // Make sure we have a truthy key. Otherwise we might start looking
-      // into the empty string key, which is the options for the locale
-      // data.
-      if ( ! singular_key ) {
-        throw new Error('No translation key found.');
-      }
-
-      var key  = context ? context + Jed.context_delimiter + singular_key : singular_key,
-          locale_data = this.options.locale_data,
-          dict = locale_data[ domain ],
-          defaultConf = (locale_data.messages || this.defaults.locale_data.messages)[""],
-          pluralForms = dict[""].plural_forms || dict[""]["Plural-Forms"] || dict[""]["plural-forms"] || defaultConf.plural_forms || defaultConf["Plural-Forms"] || defaultConf["plural-forms"],
-          val_list,
-          res;
-
-      var val_idx;
-      if (val === undefined) {
-        // No value passed in; assume singular key lookup.
-        val_idx = 0;
-
-      } else {
-        // Value has been passed in; use plural-forms calculations.
-
-        // Handle invalid numbers, but try casting strings for good measure
-        if ( typeof val != 'number' ) {
-          val = parseInt( val, 10 );
-
-          if ( isNaN( val ) ) {
-            throw new Error('The number that was passed in is not a number.');
-          }
+Jed.PF.interpreter = function ( ast ) {
+  return function ( n ) {
+    var res;
+    switch ( ast.type ) {
+      case 'GROUP':
+        return Jed.PF.interpreter( ast.expr )( n );
+      case 'TERNARY':
+        if ( Jed.PF.interpreter( ast.expr )( n ) ) {
+          return Jed.PF.interpreter( ast.truthy )( n );
         }
-
-        val_idx = getPluralFormFunc(pluralForms)(val);
-      }
-
-      // Throw an error if a domain isn't found
-      if ( ! dict ) {
-        throw new Error('No domain named `' + domain + '` could be found.');
-      }
-
-      val_list = dict[ key ];
-
-      // If there is no match, then revert back to
-      // english style singular/plural with the keys passed in.
-      if ( ! val_list || val_idx > val_list.length ) {
-        if (this.options.missing_key_callback) {
-          this.options.missing_key_callback(key, domain);
-        }
-        res = [ singular_key, plural_key ];
-
-        // collect untranslated strings
-        if (this.options.debug===true) {
-          console.log(res[ getPluralFormFunc(pluralForms)( val ) ]);
-        }
-        return res[ getPluralFormFunc()( val ) ];
-      }
-
-      res = val_list[ val_idx ];
-
-      // This includes empty strings on purpose
-      if ( ! res  ) {
-        res = [ singular_key, plural_key ];
-        return res[ getPluralFormFunc()( val ) ];
-      }
-      return res;
+        return Jed.PF.interpreter( ast.falsey )( n );
+      case 'OR':
+        return Jed.PF.interpreter( ast.left )( n ) || Jed.PF.interpreter( ast.right )( n );
+      case 'AND':
+        return Jed.PF.interpreter( ast.left )( n ) && Jed.PF.interpreter( ast.right )( n );
+      case 'LT':
+        return Jed.PF.interpreter( ast.left )( n ) < Jed.PF.interpreter( ast.right )( n );
+      case 'GT':
+        return Jed.PF.interpreter( ast.left )( n ) > Jed.PF.interpreter( ast.right )( n );
+      case 'LTE':
+        return Jed.PF.interpreter( ast.left )( n ) <= Jed.PF.interpreter( ast.right )( n );
+      case 'GTE':
+        return Jed.PF.interpreter( ast.left )( n ) >= Jed.PF.interpreter( ast.right )( n );
+      case 'EQ':
+        return Jed.PF.interpreter( ast.left )( n ) == Jed.PF.interpreter( ast.right )( n );
+      case 'NEQ':
+        return Jed.PF.interpreter( ast.left )( n ) != Jed.PF.interpreter( ast.right )( n );
+      case 'MOD':
+        return Jed.PF.interpreter( ast.left )( n ) % Jed.PF.interpreter( ast.right )( n );
+      case 'VAR':
+        return n;
+      case 'NUM':
+        return ast.val;
+      default:
+        throw new Error("Invalid Token found.");
     }
-  });
-
-
-  // Start the Plural forms section
-  // This is a full plural form expression parser. It is used to avoid
-  // running 'eval' or 'new Function' directly against the plural
-  // forms.
-  //
-  // This can be important if you get translations done through a 3rd
-  // party vendor. I encourage you to use this instead, however, I
-  // also will provide a 'precompiler' that you can use at build time
-  // to output valid/safe function representations of the plural form
-  // expressions. This means you can build this code out for the most
-  // part.
-  Jed.PF = {};
-
-  Jed.PF.parse = function ( p ) {
-    var plural_str = Jed.PF.extractPluralExpr( p );
-    return Jed.PF.parser.parse.call(Jed.PF.parser, plural_str);
   };
+};
 
-  Jed.PF.compile = function ( p ) {
-    // Handle trues and falses as 0 and 1
-    function imply( val ) {
-      return (val === true ? 1 : val ? val : 0);
-    }
+Jed.PF.regexps = {
+  TRIM_BEG: /^\s\s*/,
+  TRIM_END: /\s\s*$/,
+  HAS_SEMICOLON: /;\s*$/,
+  NPLURALS: /nplurals\=(\d+);/,
+  PLURAL: /plural\=(.*);/
+};
 
-    var ast = Jed.PF.parse( p );
-    return function ( n ) {
-      return imply( Jed.PF.interpreter( ast )( n ) );
-    };
-  };
+Jed.PF.extractPluralExpr = function ( p ) {
+  // trim first
+  p = p.replace(Jed.PF.regexps.TRIM_BEG, '').replace(Jed.PF.regexps.TRIM_END, '');
 
-  Jed.PF.interpreter = function ( ast ) {
-    return function ( n ) {
-      var res;
-      switch ( ast.type ) {
-        case 'GROUP':
-          return Jed.PF.interpreter( ast.expr )( n );
-        case 'TERNARY':
-          if ( Jed.PF.interpreter( ast.expr )( n ) ) {
-            return Jed.PF.interpreter( ast.truthy )( n );
-          }
-          return Jed.PF.interpreter( ast.falsey )( n );
-        case 'OR':
-          return Jed.PF.interpreter( ast.left )( n ) || Jed.PF.interpreter( ast.right )( n );
-        case 'AND':
-          return Jed.PF.interpreter( ast.left )( n ) && Jed.PF.interpreter( ast.right )( n );
-        case 'LT':
-          return Jed.PF.interpreter( ast.left )( n ) < Jed.PF.interpreter( ast.right )( n );
-        case 'GT':
-          return Jed.PF.interpreter( ast.left )( n ) > Jed.PF.interpreter( ast.right )( n );
-        case 'LTE':
-          return Jed.PF.interpreter( ast.left )( n ) <= Jed.PF.interpreter( ast.right )( n );
-        case 'GTE':
-          return Jed.PF.interpreter( ast.left )( n ) >= Jed.PF.interpreter( ast.right )( n );
-        case 'EQ':
-          return Jed.PF.interpreter( ast.left )( n ) == Jed.PF.interpreter( ast.right )( n );
-        case 'NEQ':
-          return Jed.PF.interpreter( ast.left )( n ) != Jed.PF.interpreter( ast.right )( n );
-        case 'MOD':
-          return Jed.PF.interpreter( ast.left )( n ) % Jed.PF.interpreter( ast.right )( n );
-        case 'VAR':
-          return n;
-        case 'NUM':
-          return ast.val;
-        default:
-          throw new Error("Invalid Token found.");
-      }
-    };
-  };
+  if (! Jed.PF.regexps.HAS_SEMICOLON.test(p)) {
+    p = p.concat(';');
+  }
 
-  Jed.PF.regexps = {
-    TRIM_BEG: /^\s\s*/,
-    TRIM_END: /\s\s*$/,
-    HAS_SEMICOLON: /;\s*$/,
-    NPLURALS: /nplurals\=(\d+);/,
-    PLURAL: /plural\=(.*);/
-  };
+  var nplurals_matches = p.match( Jed.PF.regexps.NPLURALS ),
+      res = {},
+      plural_matches;
 
-  Jed.PF.extractPluralExpr = function ( p ) {
-    // trim first
-    p = p.replace(Jed.PF.regexps.TRIM_BEG, '').replace(Jed.PF.regexps.TRIM_END, '');
+  // Find the nplurals number
+  if ( nplurals_matches.length > 1 ) {
+    res.nplurals = nplurals_matches[1];
+  }
+  else {
+    throw new Error('nplurals not found in plural_forms string: ' + p );
+  }
 
-    if (! Jed.PF.regexps.HAS_SEMICOLON.test(p)) {
-      p = p.concat(';');
-    }
+  // remove that data to get to the formula
+  p = p.replace( Jed.PF.regexps.NPLURALS, "" );
+  plural_matches = p.match( Jed.PF.regexps.PLURAL );
 
-    var nplurals_matches = p.match( Jed.PF.regexps.NPLURALS ),
-        res = {},
-        plural_matches;
+  if (!( plural_matches && plural_matches.length > 1 ) ) {
+    throw new Error('`plural` expression not found: ' + p);
+  }
+  return plural_matches[ 1 ];
+};
 
-    // Find the nplurals number
-    if ( nplurals_matches.length > 1 ) {
-      res.nplurals = nplurals_matches[1];
-    }
-    else {
-      throw new Error('nplurals not found in plural_forms string: ' + p );
-    }
-
-    // remove that data to get to the formula
-    p = p.replace( Jed.PF.regexps.NPLURALS, "" );
-    plural_matches = p.match( Jed.PF.regexps.PLURAL );
-
-    if (!( plural_matches && plural_matches.length > 1 ) ) {
-      throw new Error('`plural` expression not found: ' + p);
-    }
-    return plural_matches[ 1 ];
-  };
-
-  /* Jison generated parser */
-  Jed.PF.parser = (function(){
+/* Jison generated parser */
+Jed.PF.parser = (function(){
 
 var parser = {trace: function trace() { },
 yy: {},
@@ -740,5 +739,3 @@ return parser;
 // End parser
 
 module.exports = Jed;
-
-})(this);
