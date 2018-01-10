@@ -26,60 +26,6 @@ in order to offer easy upgrades -- jsgettext.berlios.de
 */
 (function (root, undef) {
 
-  // Set up some underscore-style functions, if you already have
-  // underscore, feel free to delete this section, and use it
-  // directly, however, the amount of functions used doesn't
-  // warrant having underscore as a full dependency.
-  // Underscore 1.3.0 was used to port and is licensed
-  // under the MIT License by Jeremy Ashkenas.
-  var ArrayProto    = Array.prototype,
-      ObjProto      = Object.prototype,
-      slice         = ArrayProto.slice,
-      hasOwnProp    = ObjProto.hasOwnProperty,
-      nativeForEach = ArrayProto.forEach,
-      breaker       = {};
-
-  // We're not using the OOP style _ so we don't need the
-  // extra level of indirection. This still means that you
-  // sub out for real `_` though.
-  var _ = {
-    forEach : function( obj, iterator, context ) {
-      var i, l, key;
-      if ( obj === null ) {
-        return;
-      }
-
-      if ( nativeForEach && obj.forEach === nativeForEach ) {
-        obj.forEach( iterator, context );
-      }
-      else if ( obj.length === +obj.length ) {
-        for ( i = 0, l = obj.length; i < l; i++ ) {
-          if ( i in obj && iterator.call( context, obj[i], i, obj ) === breaker ) {
-            return;
-          }
-        }
-      }
-      else {
-        for ( key in obj) {
-          if ( hasOwnProp.call( obj, key ) ) {
-            if ( iterator.call (context, obj[key], key, obj ) === breaker ) {
-              return;
-            }
-          }
-        }
-      }
-    },
-    extend : function( obj ) {
-      this.forEach( slice.call( arguments, 1 ), function ( source ) {
-        for ( var prop in source ) {
-          obj[prop] = source[prop];
-        }
-      });
-      return obj;
-    }
-  };
-  // END Miniature underscore impl
-
   // Jed is a constructor function
   var Jed = function ( options ) {
     // Some minimal defaults
@@ -101,7 +47,7 @@ in order to offer easy upgrades -- jsgettext.berlios.de
     };
 
     // Mix in the sent options with the default options
-    this.options = _.extend( {}, this.defaults, options );
+    this.options = Object.assign( {}, this.defaults, options );
     this.textdomain( this.options.domain );
 
     if ( options.domain && ! this.options.locale_data[ this.options.domain ] ) {
@@ -120,47 +66,11 @@ in order to offer easy upgrades -- jsgettext.berlios.de
     return Jed.PF.compile( plural_form_string || "nplurals=2; plural=(n != 1);");
   }
 
-  function Chain( key, i18n ){
-    this._key = key;
-    this._i18n = i18n;
-  }
-
-  // Create a chainable api for adding args prettily
-  _.extend( Chain.prototype, {
-    onDomain : function ( domain ) {
-      this._domain = domain;
-      return this;
-    },
-    withContext : function ( context ) {
-      this._context = context;
-      return this;
-    },
-    ifPlural : function ( num, pkey ) {
-      this._val = num;
-      this._pkey = pkey;
-      return this;
-    },
-    fetch : function ( sArr ) {
-      if ( {}.toString.call( sArr ) != '[object Array]' ) {
-        sArr = [].slice.call(arguments, 0);
-      }
-      return ( sArr && sArr.length ? Jed.sprintf : function(x){ return x; } )(
-        this._i18n.dcnpgettext(this._domain, this._context, this._key, this._pkey, this._val),
-        sArr
-      );
-    }
-  });
-
   // Add functions to the Jed prototype.
   // These will be the functions on the object that's returned
   // from creating a `new Jed()`
   // These seem redundant, but they gzip pretty well.
-  _.extend( Jed.prototype, {
-    // The sexier api start point
-    translate : function ( key ) {
-      return new Chain( key, this );
-    },
-
+  Object.assign( Jed.prototype, {
     textdomain : function ( domain ) {
       if ( ! domain ) {
         return this._textdomain;
@@ -321,190 +231,6 @@ in order to offer easy upgrades -- jsgettext.berlios.de
     }
   });
 
-
-  // We add in sprintf capabilities for post translation value interolation
-  // This is not internally used, so you can remove it if you have this
-  // available somewhere else, or want to use a different system.
-
-  // We _slightly_ modify the normal sprintf behavior to more gracefully handle
-  // undefined values.
-
-  /**
-   sprintf() for JavaScript 0.7-beta1
-   http://www.diveintojavascript.com/projects/javascript-sprintf
-
-   Copyright (c) Alexandru Marasteanu <alexaholic [at) gmail (dot] com>
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are met:
-       * Redistributions of source code must retain the above copyright
-         notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above copyright
-         notice, this list of conditions and the following disclaimer in the
-         documentation and/or other materials provided with the distribution.
-       * Neither the name of sprintf() for JavaScript nor the
-         names of its contributors may be used to endorse or promote products
-         derived from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-   DISCLAIMED. IN NO EVENT SHALL Alexandru Marasteanu BE LIABLE FOR ANY
-   DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-   (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-   LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-   ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-   SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  */
-  var sprintf = (function() {
-    function get_type(variable) {
-      return Object.prototype.toString.call(variable).slice(8, -1).toLowerCase();
-    }
-    function str_repeat(input, multiplier) {
-      for (var output = []; multiplier > 0; output[--multiplier] = input) {/* do nothing */}
-      return output.join('');
-    }
-
-    var str_format = function() {
-      if (!str_format.cache.hasOwnProperty(arguments[0])) {
-        str_format.cache[arguments[0]] = str_format.parse(arguments[0]);
-      }
-      return str_format.format.call(null, str_format.cache[arguments[0]], arguments);
-    };
-
-    str_format.format = function(parse_tree, argv) {
-      var cursor = 1, tree_length = parse_tree.length, node_type = '', arg, output = [], i, k, match, pad, pad_character, pad_length;
-      for (i = 0; i < tree_length; i++) {
-        node_type = get_type(parse_tree[i]);
-        if (node_type === 'string') {
-          output.push(parse_tree[i]);
-        }
-        else if (node_type === 'array') {
-          match = parse_tree[i]; // convenience purposes only
-          if (match[2]) { // keyword argument
-            arg = argv[cursor];
-            for (k = 0; k < match[2].length; k++) {
-              if (!arg.hasOwnProperty(match[2][k])) {
-                throw(sprintf('[sprintf] property "%s" does not exist', match[2][k]));
-              }
-              arg = arg[match[2][k]];
-            }
-          }
-          else if (match[1]) { // positional argument (explicit)
-            arg = argv[match[1]];
-          }
-          else { // positional argument (implicit)
-            arg = argv[cursor++];
-          }
-
-          if (/[^s]/.test(match[8]) && (get_type(arg) != 'number')) {
-            throw(sprintf('[sprintf] expecting number but found %s', get_type(arg)));
-          }
-
-          // Jed EDIT
-          if ( typeof arg == 'undefined' || arg === null ) {
-            arg = '';
-          }
-          // Jed EDIT
-
-          switch (match[8]) {
-            case 'b': arg = arg.toString(2); break;
-            case 'c': arg = String.fromCharCode(arg); break;
-            case 'd': arg = parseInt(arg, 10); break;
-            case 'e': arg = match[7] ? arg.toExponential(match[7]) : arg.toExponential(); break;
-            case 'f': arg = match[7] ? parseFloat(arg).toFixed(match[7]) : parseFloat(arg); break;
-            case 'o': arg = arg.toString(8); break;
-            case 's': arg = ((arg = String(arg)) && match[7] ? arg.substring(0, match[7]) : arg); break;
-            case 'u': arg = Math.abs(arg); break;
-            case 'x': arg = arg.toString(16); break;
-            case 'X': arg = arg.toString(16).toUpperCase(); break;
-          }
-          arg = (/[def]/.test(match[8]) && match[3] && arg >= 0 ? '+'+ arg : arg);
-          pad_character = match[4] ? match[4] == '0' ? '0' : match[4].charAt(1) : ' ';
-          pad_length = match[6] - String(arg).length;
-          pad = match[6] ? str_repeat(pad_character, pad_length) : '';
-          output.push(match[5] ? arg + pad : pad + arg);
-        }
-      }
-      return output.join('');
-    };
-
-    str_format.cache = {};
-
-    str_format.parse = function(fmt) {
-      var _fmt = fmt, match = [], parse_tree = [], arg_names = 0;
-      while (_fmt) {
-        if ((match = /^[^\x25]+/.exec(_fmt)) !== null) {
-          parse_tree.push(match[0]);
-        }
-        else if ((match = /^\x25{2}/.exec(_fmt)) !== null) {
-          parse_tree.push('%');
-        }
-        else if ((match = /^\x25(?:([1-9]\d*)\$|\(([^\)]+)\))?(\+)?(0|'[^$])?(-)?(\d+)?(?:\.(\d+))?([b-fosuxX])/.exec(_fmt)) !== null) {
-          if (match[2]) {
-            arg_names |= 1;
-            var field_list = [], replacement_field = match[2], field_match = [];
-            if ((field_match = /^([a-z_][a-z_\d]*)/i.exec(replacement_field)) !== null) {
-              field_list.push(field_match[1]);
-              while ((replacement_field = replacement_field.substring(field_match[0].length)) !== '') {
-                if ((field_match = /^\.([a-z_][a-z_\d]*)/i.exec(replacement_field)) !== null) {
-                  field_list.push(field_match[1]);
-                }
-                else if ((field_match = /^\[(\d+)\]/.exec(replacement_field)) !== null) {
-                  field_list.push(field_match[1]);
-                }
-                else {
-                  throw('[sprintf] huh?');
-                }
-              }
-            }
-            else {
-              throw('[sprintf] huh?');
-            }
-            match[2] = field_list;
-          }
-          else {
-            arg_names |= 2;
-          }
-          if (arg_names === 3) {
-            throw('[sprintf] mixing positional and named placeholders is not (yet) supported');
-          }
-          parse_tree.push(match);
-        }
-        else {
-          throw('[sprintf] huh?');
-        }
-        _fmt = _fmt.substring(match[0].length);
-      }
-      return parse_tree;
-    };
-
-    return str_format;
-  })();
-
-  var vsprintf = function(fmt, argv) {
-    argv.unshift(fmt);
-    return sprintf.apply(null, argv);
-  };
-
-  Jed.parse_plural = function ( plural_forms, n ) {
-    plural_forms = plural_forms.replace(/n/g, n);
-    return Jed.parse_expression(plural_forms);
-  };
-
-  Jed.sprintf = function ( fmt, args ) {
-    if ( {}.toString.call( args ) == '[object Array]' ) {
-      return vsprintf( fmt, [].slice.call(args) );
-    }
-    return sprintf.apply(this, [].slice.call(arguments) );
-  };
-
-  Jed.prototype.sprintf = function () {
-    return Jed.sprintf.apply(this, arguments);
-  };
-  // END sprintf Implementation
 
   // Start the Plural forms section
   // This is a full plural form expression parser. It is used to avoid
@@ -1013,21 +739,6 @@ return parser;
 })();
 // End parser
 
-  // Handle node, amd, and global systems
-  if (typeof exports !== 'undefined') {
-    if (typeof module !== 'undefined' && module.exports) {
-      exports = module.exports = Jed;
-    }
-    exports.Jed = Jed;
-  }
-  else {
-    if (typeof define === 'function' && define.amd) {
-      define(function() {
-        return Jed;
-      });
-    }
-    // Leak a global regardless of module system
-    root['Jed'] = Jed;
-  }
+module.exports = Jed;
 
 })(this);
