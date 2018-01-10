@@ -78,48 +78,48 @@ Object.assign( Jed.prototype, {
   },
 
   gettext : function ( key ) {
-    return this.dcnpgettext.call( this, undefined, undefined, key );
+    return this.dcnpgettext( undefined, undefined, key );
   },
 
   dgettext : function ( domain, key ) {
-   return this.dcnpgettext.call( this, domain, undefined, key );
+   return this.dcnpgettext( domain, undefined, key );
   },
 
   dcgettext : function ( domain , key /*, category */ ) {
     // Ignores the category anyways
-    return this.dcnpgettext.call( this, domain, undefined, key );
+    return this.dcnpgettext( domain, undefined, key );
   },
 
   ngettext : function ( skey, pkey, val ) {
-    return this.dcnpgettext.call( this, undefined, undefined, skey, pkey, val );
+    return this.dcnpgettext( undefined, undefined, skey, pkey, val );
   },
 
   dngettext : function ( domain, skey, pkey, val ) {
-    return this.dcnpgettext.call( this, domain, undefined, skey, pkey, val );
+    return this.dcnpgettext( domain, undefined, skey, pkey, val );
   },
 
   dcngettext : function ( domain, skey, pkey, val/*, category */) {
-    return this.dcnpgettext.call( this, domain, undefined, skey, pkey, val );
+    return this.dcnpgettext( domain, undefined, skey, pkey, val );
   },
 
   pgettext : function ( context, key ) {
-    return this.dcnpgettext.call( this, undefined, context, key );
+    return this.dcnpgettext( undefined, context, key );
   },
 
   dpgettext : function ( domain, context, key ) {
-    return this.dcnpgettext.call( this, domain, context, key );
+    return this.dcnpgettext( domain, context, key );
   },
 
   dcpgettext : function ( domain, context, key/*, category */) {
-    return this.dcnpgettext.call( this, domain, context, key );
+    return this.dcnpgettext( domain, context, key );
   },
 
   npgettext : function ( context, skey, pkey, val ) {
-    return this.dcnpgettext.call( this, undefined, context, skey, pkey, val );
+    return this.dcnpgettext( undefined, context, skey, pkey, val );
   },
 
   dnpgettext : function ( domain, context, skey, pkey, val ) {
-    return this.dcnpgettext.call( this, domain, context, skey, pkey, val );
+    return this.dcnpgettext( domain, context, skey, pkey, val );
   },
 
   // The most fully qualified gettext function. It has every option.
@@ -146,7 +146,7 @@ Object.assign( Jed.prototype, {
       // We do this by instantiating a brand new Jed instance with the default set
       // for everything that could be broken.
       fallback = new Jed();
-      return fallback.dcnpgettext.call( fallback, undefined, undefined, singular_key, plural_key, val );
+      return fallback.dcnpgettext( undefined, undefined, singular_key, plural_key, val );
     }
 
     // No translation data provided
